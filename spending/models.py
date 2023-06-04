@@ -24,7 +24,7 @@ class BotUsers(models.Model):
     first_name = models.CharField(verbose_name='имя', max_length=100, blank=False, null=True)
     last_name = models.CharField(verbose_name='фамилия', max_length=100, blank=False, null=True)
     start_at = models.DateTimeField(verbose_name='дата старта бота', auto_now_add=True)
-    language_code = models.CharField(verbose_name='язык', max_length=100, blank=False, null=True)
+    language_code = models.CharField(verbose_name='язык', max_length=10, blank=False, null=True)
 
     class Meta:
         ordering = ['-id']
