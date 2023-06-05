@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from spending.models import ProjectSettings, BotUsers, SpendingCategory
+from spending.models import ProjectSettings, BotUsers, SpendingCategory, Spending
 
 
 @admin.register(ProjectSettings)
@@ -53,4 +53,24 @@ class SpendingCategoryAdmin(admin.ModelAdmin):
     list_display_links = (
         'id',
         'name',
+    )
+
+
+@admin.register(Spending)
+class SpendingAdmin(admin.ModelAdmin):
+    list_display = (
+        'id',
+        'bot_user',
+        'amount',
+        'category',
+        'description',
+        'created_at',
+    )
+    list_display_links = (
+        'id',
+        'bot_user',
+        'amount',
+        'category',
+        'description',
+        'created_at',
     )

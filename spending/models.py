@@ -26,6 +26,9 @@ class BotUsers(models.Model):
     start_at = models.DateTimeField(verbose_name='дата старта бота', auto_now_add=True)
     language_code = models.CharField(verbose_name='язык', max_length=10, blank=False, null=True)
 
+    def __str__(self):
+        return f'{self.tlg_id!r}|{self.tlg_username!r}'
+
     class Meta:
         ordering = ['-id']
         verbose_name = 'юзер spending бота'
@@ -37,6 +40,9 @@ class SpendingCategory(models.Model):
     Модель для таблицы БД с категориями трат
     """
     name = models.CharField(verbose_name='категория трат', max_length=50)
+
+    def __str__(self):
+        return f'кат. трат: {self.name!r}'
 
     class Meta:
         ordering = ['id']

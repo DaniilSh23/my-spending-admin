@@ -1,10 +1,14 @@
+from django.core.exceptions import ObjectDoesNotExist
+from django.http import HttpResponse
 from django.shortcuts import render
+from django.views import View
 from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from myspending.settings import MY_LOGGER, BOT_TOKEN
-from spending.models import BotUsers, ProjectSettings
+from spending.forms import NewSpendingForm
+from spending.models import BotUsers, ProjectSettings, SpendingCategory, Spending
 from spending.serializers import StartBotSerializer, GetSettingsSerializer
 
 
@@ -61,3 +65,69 @@ class GetSettingsView(APIView):
         else:
             MY_LOGGER.warning(f'Значение ключа слишком длинное')
             return Response(data={'result:' 'значение ключа слишком длинное'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class WriteSpendingView(View):
+    """
+    Вьюшки для обработки get и post запросов при создании записи о трате
+    """
+    def get(self, request):
+        MY_LOGGER.debug(f'Получен GET запрос для отображения формы внесения трат.')
+        context = {
+            'categories': SpendingCategory.objects.all(),
+        }
+        return render(request, template_name='spending/write_spending.html', context=context)
+
+    def post(self, request):
+        MY_LOGGER.debug(f'Получен POST запрос для записи новой траты. {request.POST}')
+
+        form = NewSpendingForm(request.POST)
+        if form.is_valid():
+            MY_LOGGER.debug(f'POST запрос валиден')
+
+            # Достаём из БД юзера по его tlg_id
+            try:
+                user_obj = BotUsers.objects.get(tlg_id=form.cleaned_data.get("tlg_id"))
+            except ObjectDoesNotExist:
+                MY_LOGGER.warning(f'Объект BotUser с tlg_id={form.cleaned_data.get("tlg_id")} не найден в БД')
+                return HttpResponse(status=404)
+
+            # Достаём из БД категорию
+            try:
+                category_obj = SpendingCategory.objects.get(name=form.cleaned_data.get("category"))
+            except ObjectDoesNotExist:
+                MY_LOGGER.warning(f'Объект SpendingCategory с name={form.cleaned_data.get("category")} не найден в БД')
+                return HttpResponse(status=404)
+
+            # Создаём новую запись отратах
+            try:
+                spending_obj = Spending.objects.create(
+                    bot_user=user_obj,
+                    amount=form.cleaned_data.get("amount"),
+                    category=category_obj,
+                    description=form.cleaned_data.get("description"),
+                )
+            except Exception as err:
+                MY_LOGGER.error(f'Неожиданная ошибка при создании записи в БД о новых тратах. Вот её текст: {err}')
+                return HttpResponse(status=400, content='Неверный запрос.')
+
+            # Даём ответ в случае успешной обработки запроса
+            context = {
+                'amount': spending_obj.amount,
+                'category': category_obj.name,
+                'datetime': spending_obj.created_at,
+            }
+            MY_LOGGER.success(f'Запрос на запись новой траты для юзера {user_obj!r} успешно обработан!')
+            return render(request, template_name='spending/success.html', context=context)
+
+        else:
+            MY_LOGGER.debug(f'POST запрос невалиден')
+            context = {
+                'categories': SpendingCategory.objects.all(),
+                'form': form,
+            }
+            return render(request, template_name='spending/write_spending.html', context=context)
+
+
+def test_view(request):
+    return render(request, template_name='spending/success.html')
