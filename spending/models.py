@@ -20,7 +20,6 @@ class BotUsers(models.Model):
     """
     tlg_id = models.CharField(verbose_name='TG ID', max_length=30)
     tlg_username = models.CharField(verbose_name='TG username', max_length=50, blank=False, null=True)
-    telephone = models.CharField(verbose_name='телефон', max_length=15, blank=False, null=True)
     first_name = models.CharField(verbose_name='имя', max_length=100, blank=False, null=True)
     last_name = models.CharField(verbose_name='фамилия', max_length=100, blank=False, null=True)
     start_at = models.DateTimeField(verbose_name='дата старта бота', auto_now_add=True)

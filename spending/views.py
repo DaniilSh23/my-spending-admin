@@ -1,3 +1,6 @@
+import datetime
+
+import pytz
 from django.core.exceptions import ObjectDoesNotExist
 from django.http import HttpResponse
 from django.shortcuts import render
@@ -6,10 +9,10 @@ from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from myspending.settings import MY_LOGGER, BOT_TOKEN
+from myspending.settings import MY_LOGGER, BOT_TOKEN, TIME_ZONE
 from spending.forms import NewSpendingForm
 from spending.models import BotUsers, ProjectSettings, SpendingCategory, Spending
-from spending.serializers import StartBotSerializer, GetSettingsSerializer
+from spending.serializers import StartBotSerializer, GetSettingsSerializer, GetDaySpendingSerializer
 
 
 class StartBotView(APIView):
@@ -28,7 +31,6 @@ class StartBotView(APIView):
                 defaults={
                     "tlg_id": serializer.validated_data.get("tlg_id"),
                     "tlg_username": serializer.validated_data.get("tlg_username"),
-                    "telephone": serializer.validated_data.get("telephone"),
                     "first_name": serializer.validated_data.get("first_name"),
                     "last_name": serializer.validated_data.get("last_name"),
                     "language_code": serializer.validated_data.get("language_code"),
@@ -127,6 +129,45 @@ class WriteSpendingView(View):
                 'form': form,
             }
             return render(request, template_name='spending/write_spending.html', context=context)
+
+
+class GetDaySpending(APIView):
+    """
+    Вьюшка для получения трат за день, для юзера по tlg_id
+    """
+    def get(self, request: Request):
+        """
+        Обработка GET запроса, в параметр необходимо передать tlg_id.
+        """
+        MY_LOGGER.debug(f'Принят GET запрос для получения трат за день юзера с '
+                        f'tlg_id == {request.query_params.get("tlg_id")}')
+        tlg_id = request.query_params.get("tlg_id")
+
+        if tlg_id.isdigit() and len(tlg_id) < 15:
+            try:
+                user_obj = BotUsers.objects.get(tlg_id=tlg_id)
+            except ObjectDoesNotExist:
+                MY_LOGGER.debug(f'В БД не найден юзер с tlg_id=={tlg_id}')
+                return Response(data={'result': f'user not found by TG ID == {tlg_id}'},
+                                status=status.HTTP_404_NOT_FOUND)
+
+            now_date = datetime.datetime.now(tz=pytz.timezone(TIME_ZONE)).date()
+            spending_lst = Spending.objects.filter(created_at__date=now_date, bot_user=user_obj).\
+                prefetch_related('category')
+            MY_LOGGER.debug(f'Отфильтрованные траты для юзера {user_obj!r} по дате {now_date}: {spending_lst}')
+            data_lst = [{
+                "bot_user": i_obj.bot_user.tlg_id,
+                "amount": i_obj.amount,
+                "category": i_obj.category.name,
+                "description": i_obj.description,
+                "created_at": i_obj.created_at,
+            } for i_obj in spending_lst]
+            serializer_data = GetDaySpendingSerializer(instance=data_lst, many=True).data
+            return Response(data=serializer_data, status=status.HTTP_200_OK)
+
+        else:
+            MY_LOGGER.debug(f'Получен неверный запрос. {request.GET}')
+            return Response(data={'result': 'invalid request params'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 def test_view(request):
