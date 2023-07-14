@@ -12,7 +12,7 @@ from rest_framework.response import Response
 from myspending.settings import MY_LOGGER, BOT_TOKEN, TIME_ZONE
 from spending.forms import NewSpendingForm
 from spending.models import BotUsers, ProjectSettings, SpendingCategory, Spending
-from spending.serializers import StartBotSerializer, GetSettingsSerializer, GetDaySpendingSerializer
+from spending.serializers import StartBotSerializer, GetSettingsSerializer, SpendingSerializer
 
 
 class StartBotView(APIView):
@@ -143,7 +143,7 @@ class GetDaySpending(APIView):
                         f'tlg_id == {request.query_params.get("tlg_id")}')
         tlg_id = request.query_params.get("tlg_id")
 
-        if tlg_id.isdigit() and len(tlg_id) < 15:
+        if tlg_id and tlg_id.isdigit() and len(tlg_id) < 15:
             try:
                 user_obj = BotUsers.objects.get(tlg_id=tlg_id)
             except ObjectDoesNotExist:
@@ -162,7 +162,46 @@ class GetDaySpending(APIView):
                 "description": i_obj.description,
                 "created_at": i_obj.created_at,
             } for i_obj in spending_lst]
-            serializer_data = GetDaySpendingSerializer(instance=data_lst, many=True).data
+            serializer_data = SpendingSerializer(instance=data_lst, many=True).data
+            return Response(data=serializer_data, status=status.HTTP_200_OK)
+
+        else:
+            MY_LOGGER.debug(f'Получен неверный запрос. {request.GET}')
+            return Response(data={'result': 'invalid request params'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class GetMonthSpending(APIView):
+    """
+    Вьюшка для получения трат за месяц, для юзера по tlg_id
+    """
+    def get(self, request: Request):    # TODO: здесь обработка запроса для трат за день, нужно переделать на месяц
+        """
+        Обработка GET запроса, в параметр необходимо передать tlg_id.
+        """
+        MY_LOGGER.debug(f'Принят GET запрос для получения трат за месяц юзера с '
+                        f'tlg_id == {request.query_params.get("tlg_id")}')
+        tlg_id = request.query_params.get("tlg_id")
+
+        if tlg_id and tlg_id.isdigit() and len(tlg_id) < 15:
+            try:
+                user_obj = BotUsers.objects.get(tlg_id=tlg_id)
+            except ObjectDoesNotExist:
+                MY_LOGGER.debug(f'В БД не найден юзер с tlg_id=={tlg_id}')
+                return Response(data={'result': f'user not found by TG ID == {tlg_id}'},
+                                status=status.HTTP_404_NOT_FOUND)
+
+            this_month = datetime.datetime.now(tz=pytz.timezone(TIME_ZONE)).date().month
+            spending_lst = Spending.objects.filter(created_at__month=this_month, bot_user=user_obj).\
+                prefetch_related('category')
+            MY_LOGGER.debug(f'Отфильтрованные траты для юзера {user_obj!r} по месяцу {this_month}: {spending_lst}')
+            data_lst = [{
+                "bot_user": i_obj.bot_user.tlg_id,
+                "amount": i_obj.amount,
+                "category": i_obj.category.name,
+                "description": i_obj.description,
+                "created_at": i_obj.created_at,
+            } for i_obj in spending_lst]
+            serializer_data = SpendingSerializer(instance=data_lst, many=True).data
             return Response(data=serializer_data, status=status.HTTP_200_OK)
 
         else:

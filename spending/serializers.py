@@ -21,7 +21,7 @@ class GetSettingsSerializer(serializers.Serializer):
     key = serializers.CharField(max_length=51)
 
 
-class GetDaySpendingSerializer(serializers.Serializer):
+class SpendingSerializer(serializers.Serializer):
     """
     Сериалайзер для модели трат (Spending), необходим для ответа на запрос данных из бота.
     """
