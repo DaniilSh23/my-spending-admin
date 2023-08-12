@@ -204,3 +204,8 @@ TELEGRAM_AUTH_RESULTS = dict()  # Тут храним ответы на запр
 # Определяем event loop для асинхронной работы pyrogram
 LOOP = asyncio.new_event_loop()
 asyncio.set_event_loop(LOOP)
+
+# Настройки для проксирования запросов от Nginx при деплое через докер
+CSRF_TRUSTED_ORIGINS = ['http://0.0.0.0:8000']
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = True
