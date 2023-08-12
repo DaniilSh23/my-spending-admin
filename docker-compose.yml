@@ -17,7 +17,7 @@ services:
     image: redis:latest
     networks:
       - mynetwork
-  cfu_mytlg_admin: # Django приложения
+  my_spending_admin: # Django приложения
     build: # Собираем контейнер из Dockerfile
       context: .
       dockerfile: Dockerfile
