@@ -244,6 +244,7 @@ class AverageAmountSpent(APIView):
                 if current_month == 1:
                     spending_lst = Spending.objects.filter(bot_user=user_obj, category=i_category,
                                                            created_at__year=current_year - 1)
+                    months_for_calculate = 12
                 # Стандартный случай расчета, берем все записи за год, кроме текущего месяца
                 else:
                     spending_lst = (
@@ -252,12 +253,15 @@ class AverageAmountSpent(APIView):
                         exclude(created_at__year=current_year, created_at__month=current_month).
                         prefetch_related('category')
                     )
-                MY_LOGGER.debug(f'Получено {len(spending_lst)} записей из БД о тратах за год.')
+                    months_for_calculate = current_month - 1
+                MY_LOGGER.debug(f'В категории {i_category.name!r} получено {len(spending_lst)} '
+                                f'записей из БД о тратах за год.')
 
                 # Выполняем расчет средней суммы траты в категории
                 average_amount = 0
                 for i_spending in spending_lst:
                     average_amount += float(i_spending.amount)
+                average_amount /= months_for_calculate
                 MY_LOGGER.debug(f'Средння сумма трат в категори {i_category.name!r} == {average_amount}')
                 results.append((average_amount, i_category.name))
 
