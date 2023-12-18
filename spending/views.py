@@ -12,13 +12,15 @@ from rest_framework.response import Response
 from myspending.settings import MY_LOGGER, BOT_TOKEN, TIME_ZONE
 from spending.forms import NewSpendingForm
 from spending.models import BotUsers, ProjectSettings, SpendingCategory, Spending
-from spending.serializers import StartBotSerializer, GetSettingsSerializer, SpendingSerializer
+from spending.serializers import StartBotSerializer, GetSettingsSerializer, SpendingSerializer, \
+    AverageSpendingSerializer
 
 
 class StartBotView(APIView):
     """
     Вьюшка для старта бота.
     """
+
     def post(self, request):
         MY_LOGGER.debug(f'Получен POST запрос в StartBotView. {request.data}')
 
@@ -52,6 +54,7 @@ class GetSettingsView(APIView):
     """
     Вьюшка для получения настроек по ключу
     """
+
     def post(self, request: Request):
         """
         Принимает параметр запроса key=ключ настройки. Отдаёт JSON с настройками, либо с описанием ошибки
@@ -73,6 +76,7 @@ class WriteSpendingView(View):
     """
     Вьюшки для обработки get и post запросов при создании записи о трате
     """
+
     def get(self, request):
         MY_LOGGER.debug(f'Получен GET запрос для отображения формы внесения трат.')
         context = {
@@ -135,6 +139,7 @@ class GetDaySpending(APIView):
     """
     Вьюшка для получения трат за день, для юзера по tlg_id
     """
+
     def get(self, request: Request):
         """
         Обработка GET запроса, в параметр необходимо передать tlg_id.
@@ -152,7 +157,7 @@ class GetDaySpending(APIView):
                                 status=status.HTTP_404_NOT_FOUND)
 
             now_date = datetime.datetime.now(tz=pytz.timezone(TIME_ZONE)).date()
-            spending_lst = Spending.objects.filter(created_at__date=now_date, bot_user=user_obj).\
+            spending_lst = Spending.objects.filter(created_at__date=now_date, bot_user=user_obj). \
                 prefetch_related('category')
             MY_LOGGER.debug(f'Отфильтрованные траты для юзера {user_obj!r} по дате {now_date}: {spending_lst}')
             data_lst = [{
@@ -174,7 +179,8 @@ class GetMonthSpending(APIView):
     """
     Вьюшка для получения трат за месяц, для юзера по tlg_id
     """
-    def get(self, request: Request):    # TODO: здесь обработка запроса для трат за день, нужно переделать на месяц
+
+    def get(self, request: Request):  # TODO: здесь обработка запроса для трат за день, нужно переделать на месяц
         """
         Обработка GET запроса, в параметр необходимо передать tlg_id.
         """
@@ -191,7 +197,7 @@ class GetMonthSpending(APIView):
                                 status=status.HTTP_404_NOT_FOUND)
 
             this_month = datetime.datetime.now(tz=pytz.timezone(TIME_ZONE)).date().month
-            spending_lst = Spending.objects.filter(created_at__month=this_month, bot_user=user_obj).\
+            spending_lst = Spending.objects.filter(created_at__month=this_month, bot_user=user_obj). \
                 prefetch_related('category')
             MY_LOGGER.debug(f'Отфильтрованные траты для юзера {user_obj!r} по месяцу {this_month}: {spending_lst}')
             data_lst = [{
@@ -202,6 +208,61 @@ class GetMonthSpending(APIView):
                 "created_at": i_obj.created_at,
             } for i_obj in spending_lst]
             serializer_data = SpendingSerializer(instance=data_lst, many=True).data
+            return Response(data=serializer_data, status=status.HTTP_200_OK)
+
+        else:
+            MY_LOGGER.debug(f'Получен неверный запрос. {request.GET}')
+            return Response(data={'result': 'invalid request params'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class AverageAmountSpent(APIView):
+    """
+    Вьюшка для получения средней суммы трат по категориям.
+    """
+
+    def get(self, request: Request):
+        tlg_id = request.query_params.get("tlg_id")
+        MY_LOGGER.debug(f'Принят GET запрос для подсчета средней суммы трат по категориям за год | tlg_id == {tlg_id}')
+
+        if tlg_id and tlg_id.isdigit() and len(tlg_id) < 15:
+            try:
+                user_obj = BotUsers.objects.get(tlg_id=tlg_id)
+            except ObjectDoesNotExist:
+                MY_LOGGER.debug(f'В БД не найден юзер с tlg_id=={tlg_id}')
+                return Response(data={'result': f'user not found by TG ID == {tlg_id}'},
+                                status=status.HTTP_404_NOT_FOUND)
+
+            # Предварительные рассчеты с датами
+            current_year = datetime.datetime.now(tz=pytz.timezone(TIME_ZONE)).date().year
+            current_month = datetime.datetime.now(tz=pytz.timezone(TIME_ZONE)).date().month
+            calculation_year = datetime.datetime.now(tz=pytz.timezone(TIME_ZONE)).date().year
+
+            categories = SpendingCategory.objects.all()
+            results = []
+            for i_category in categories:
+
+                # Расчет на случай, если наступил январь нового года
+                if current_year > calculation_year and current_month == 1:
+                    spending_lst = Spending.objects.filter(bot_user=user_obj, created_at__year=current_year - 1)
+                # Стандартный случай расчета, берем все записи за год, кроме текущего месяца
+                else:
+                    spending_lst = (
+                        Spending.objects.filter(bot_user=user_obj, category=i_category,
+                                                created_at__year=calculation_year).
+                        exclude(created_at__year=calculation_year, created_at__month=current_month).
+                        prefetch_related('category')
+                    )
+
+                # Выполняем расчет средней суммы траты в категории
+                average_amount = 0
+                map(lambda spend: average_amount + float(spend.amount), spending_lst)
+                results.append((average_amount, i_category.name))
+
+            data_lst = [{
+                "amount": i_obj[0],
+                "category": i_obj[1],
+            } for i_obj in results]
+            serializer_data = AverageSpendingSerializer(instance=data_lst, many=True).data
             return Response(data=serializer_data, status=status.HTTP_200_OK)
 
         else:

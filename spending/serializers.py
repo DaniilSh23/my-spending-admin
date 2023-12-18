@@ -30,3 +30,13 @@ class SpendingSerializer(serializers.Serializer):
     category = serializers.CharField(max_length=50)
     description = serializers.CharField(max_length=500)
     created_at = serializers.DateTimeField()
+
+
+class AverageSpendingSerializer(serializers.Serializer):
+    """
+    Сериалайзер для средней суммы трат в категории.
+    """
+    amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    category = serializers.CharField(max_length=50)
+
+
