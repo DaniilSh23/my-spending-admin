@@ -236,11 +236,13 @@ class AverageAmountSpent(APIView):
             # Дата и время первой записи о тратах для пользователя
             first_spending = Spending.objects.filter(bot_user_id=user_obj).aggregate(first_created_at=Min('created_at'))
             if first_spending['first_created_at']:
-                first_created_at = first_spending['first_created_at']
+                first_created_at: datetime = first_spending['first_created_at']
                 MY_LOGGER.debug(f"Дата первой записи для пользователя {user_obj}: {first_created_at} | "
                                 f"{type(first_created_at)}")
+                month_of_first_spending_record: int = first_created_at.date().month - 1
             else:
                 MY_LOGGER.debug(f"Для пользователя {user_obj} нет записей в таблице 'Spending'")
+                month_of_first_spending_record = 0
 
             # Предварительные рассчеты с датами
             current_year = datetime.datetime.now(tz=pytz.timezone(TIME_ZONE)).date().year
@@ -254,7 +256,7 @@ class AverageAmountSpent(APIView):
                 if current_month == 1:
                     spending_lst = Spending.objects.filter(bot_user=user_obj, category=i_category,
                                                            created_at__year=current_year - 1)
-                    months_for_calculate = 12
+                    months_for_calculate = 12 - month_of_first_spending_record
                 # Стандартный случай расчета, берем все записи за год, кроме текущего месяца
                 else:
                     spending_lst = (
@@ -263,7 +265,7 @@ class AverageAmountSpent(APIView):
                         exclude(created_at__year=current_year, created_at__month=current_month).
                         prefetch_related('category')
                     )
-                    months_for_calculate = current_month - 1
+                    months_for_calculate = current_month - 1 - month_of_first_spending_record
                 MY_LOGGER.debug(f'В категории {i_category.name!r} получено {len(spending_lst)} '
                                 f'записей из БД о тратах за год.')
 
