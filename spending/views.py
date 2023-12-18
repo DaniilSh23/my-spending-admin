@@ -2,6 +2,7 @@ import datetime
 
 import pytz
 from django.core.exceptions import ObjectDoesNotExist
+from django.db.models import Min
 from django.http import HttpResponse
 from django.shortcuts import render
 from django.views import View
@@ -231,6 +232,15 @@ class AverageAmountSpent(APIView):
                 MY_LOGGER.debug(f'В БД не найден юзер с tlg_id=={tlg_id}')
                 return Response(data={'result': f'user not found by TG ID == {tlg_id}'},
                                 status=status.HTTP_404_NOT_FOUND)
+
+            # Дата и время первой записи о тратах для пользователя
+            first_spending = Spending.objects.filter(bot_user_id=user_obj).aggregate(first_created_at=Min('created_at'))
+            if first_spending['first_created_at']:
+                first_created_at = first_spending['first_created_at']
+                MY_LOGGER.debug(f"Дата первой записи для пользователя {user_obj}: {first_created_at} | "
+                                f"{type(first_created_at)}")
+            else:
+                MY_LOGGER.debug(f"Для пользователя {user_obj} нет записей в таблице 'Spending'")
 
             # Предварительные рассчеты с датами
             current_year = datetime.datetime.now(tz=pytz.timezone(TIME_ZONE)).date().year
