@@ -255,7 +255,8 @@ class AverageAmountSpent(APIView):
 
                 # Выполняем расчет средней суммы траты в категории
                 average_amount = 0
-                map(lambda spend: average_amount + float(spend.amount), spending_lst)
+                for i_spending in spending_lst:
+                    average_amount += float(i_spending.amount)
                 results.append((average_amount, i_category.name))
 
             data_lst = [{
