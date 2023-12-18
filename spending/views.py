@@ -235,28 +235,30 @@ class AverageAmountSpent(APIView):
             # Предварительные рассчеты с датами
             current_year = datetime.datetime.now(tz=pytz.timezone(TIME_ZONE)).date().year
             current_month = datetime.datetime.now(tz=pytz.timezone(TIME_ZONE)).date().month
-            calculation_year = datetime.datetime.now(tz=pytz.timezone(TIME_ZONE)).date().year
 
             categories = SpendingCategory.objects.all()
             results = []
             for i_category in categories:
 
                 # Расчет на случай, если наступил январь нового года
-                if current_year > calculation_year and current_month == 1:
-                    spending_lst = Spending.objects.filter(bot_user=user_obj, created_at__year=current_year - 1)
+                if current_month == 1:
+                    spending_lst = Spending.objects.filter(bot_user=user_obj, category=i_category,
+                                                           created_at__year=current_year - 1)
                 # Стандартный случай расчета, берем все записи за год, кроме текущего месяца
                 else:
                     spending_lst = (
                         Spending.objects.filter(bot_user=user_obj, category=i_category,
-                                                created_at__year=calculation_year).
-                        exclude(created_at__year=calculation_year, created_at__month=current_month).
+                                                created_at__year=current_year).
+                        exclude(created_at__year=current_year, created_at__month=current_month).
                         prefetch_related('category')
                     )
+                MY_LOGGER.debug(f'Получено {len(spending_lst)} записей из БД о тратах за год.')
 
                 # Выполняем расчет средней суммы траты в категории
                 average_amount = 0
                 for i_spending in spending_lst:
                     average_amount += float(i_spending.amount)
+                MY_LOGGER.debug(f'Средння сумма трат в категори {i_category.name!r} == {average_amount}')
                 results.append((average_amount, i_category.name))
 
             data_lst = [{
