@@ -197,10 +197,15 @@ class GetMonthSpending(APIView):
                 return Response(data={'result': f'user not found by TG ID == {tlg_id}'},
                                 status=status.HTTP_404_NOT_FOUND)
 
-            this_month = datetime.datetime.now(tz=pytz.timezone(TIME_ZONE)).date().month
-            spending_lst = Spending.objects.filter(created_at__month=this_month, bot_user=user_obj). \
-                prefetch_related('category')
-            MY_LOGGER.debug(f'Отфильтрованные траты для юзера {user_obj!r} по месяцу {this_month}: {spending_lst}')
+            search_month = datetime.datetime.now(tz=pytz.timezone(TIME_ZONE)).date().month
+            search_year = datetime.datetime.now(tz=pytz.timezone(TIME_ZONE)).date().year
+            spending_lst = Spending.objects.filter(
+                created_at__month=search_month,
+                created_at__year=search_year,
+                bot_user=user_obj
+            ).prefetch_related('category')
+            MY_LOGGER.debug(f'Отфильтрованные траты для юзера {user_obj!r} по месяцу {search_month} и '
+                            f'году {search_year}: {spending_lst}')
             data_lst = [{
                 "bot_user": i_obj.bot_user.tlg_id,
                 "amount": i_obj.amount,
