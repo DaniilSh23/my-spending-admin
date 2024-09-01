@@ -181,13 +181,20 @@ class GetMonthSpending(APIView):
     Вьюшка для получения трат за месяц, для юзера по tlg_id
     """
 
-    def get(self, request: Request):  # TODO: здесь обработка запроса для трат за день, нужно переделать на месяц
+    def get(self, request: Request):
         """
         Обработка GET запроса, в параметр необходимо передать tlg_id.
         """
         MY_LOGGER.debug(f'Принят GET запрос для получения трат за месяц юзера с '
                         f'tlg_id == {request.query_params.get("tlg_id")}')
         tlg_id = request.query_params.get("tlg_id")
+        spend_month = request.query_params.get("spend_month")
+
+        # Если месяц трат указан в параметрах запроса и не является строкой в виде целого числа от 1 до 12
+        if spend_month and not spend_month in ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']:
+            msg = f'Параметр spend_month должен быть числом от 1 до 12. Передано значение spend_month: {spend_month}'
+            MY_LOGGER.debug(msg)
+            return Response(data={'result': msg}, status=status.HTTP_400_BAD_REQUEST)
 
         if tlg_id and tlg_id.isdigit() and len(tlg_id) < 15:
             try:
@@ -197,8 +204,12 @@ class GetMonthSpending(APIView):
                 return Response(data={'result': f'user not found by TG ID == {tlg_id}'},
                                 status=status.HTTP_404_NOT_FOUND)
 
-            search_month = datetime.datetime.now(tz=pytz.timezone(TIME_ZONE)).date().month
+            if not spend_month:
+                search_month = datetime.datetime.now(tz=pytz.timezone(TIME_ZONE)).date().month
+            else:
+                search_month = int(spend_month)
             search_year = datetime.datetime.now(tz=pytz.timezone(TIME_ZONE)).date().year
+
             spending_lst = Spending.objects.filter(
                 created_at__month=search_month,
                 created_at__year=search_year,
