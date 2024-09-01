@@ -19,7 +19,6 @@ echo "from django.contrib.auth import get_user_model; User = get_user_model(); U
 # Set keys in Django project
 echo "Set keys in Django project"
 python manage.py filldb
-python manage.py changespendingdate
 
 # Load DB data from fixture
 echo "Load DB data from fixture"

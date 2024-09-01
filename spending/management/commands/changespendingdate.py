@@ -1,7 +1,7 @@
 from django.core.management import BaseCommand
 from loguru import logger
 from datetime import datetime, timedelta
-from spending.models import Spending
+from spending.models import ProjectSettings, SpendingCategory, Spending
 
 
 class Command(BaseCommand):
@@ -10,7 +10,8 @@ class Command(BaseCommand):
     """
     def handle(self, *args, **options):
         logger.info(f'Старт команды для изменения даты и времени записи.')
-        pk_lst = [2271, 2272, 2273, 2274, 2275]
+
         today = datetime.today()
-        spendings_today = Spending.objects.filter(pk__in=pk_lst)
-        spendings_today.update(created_at=today)
+        yesterday = today - timedelta(days=1)
+        spendings_today = Spending.objects.filter(created_at__date=today)
+        spendings_today.update(created_at=yesterday)
